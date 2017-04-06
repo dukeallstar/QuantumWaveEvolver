@@ -173,9 +173,9 @@ def DrawPlot (Function):
 	for point in Function:
 		X.append(point[0])
 		Y.append(point[1])
-	plt.plot(X, Y)
+	line = plt.plot(X, Y)
 	
-	plt.ylabel('Probability Amplitude')
+	return line
 
 #Find the derivative of a function provided as a list of values using nearest neighbour
 def FunctionDerivative (Function):
@@ -241,7 +241,7 @@ def CalculateTotalProbability(ProbabilityDistribution, SpaceInterval):
 	return TotalProbability
 
 #Runs each frame to update the line to be plotted and any other main loop functions
-def Update_Line(Frame, line, Args): 
+def Update_Line(Frame, Lines, Args): 
 	global ProbabilityDistribution
 	global CurrentWaveFunction
 	global Potential
@@ -255,25 +255,42 @@ def Update_Line(Frame, line, Args):
 	for point in ProbabilityDistribution:
 		X.append(point[0])
 		Y.append(point[1])
-	line.set_data(X,Y)
+	Lines[0].set_data(X,Y)
+	
+	X = []
+	Y = []
+	for point in Potential:
+		X.append(point[0])
+		Y.append(point[1])
+	Lines[1].set_data(X,Y)
 	
 	for i in range(RenderFrame):
 		CurrentWaveFunction = CalculateNextWaveFunction(CurrentWaveFunction, Potential, TimeInterval,1)
 		ProbabilityDistribution = CalculateProbability(CurrentWaveFunction)
 	
-	DrawPlot(Potential)
+	Potential = GenerateNextFeedbackPotential(1, 'NormalizedGaussian')
 	
-	#Potential = GenerateNextFeedbackPotential(1, 'NormalizedGaussian')
-	
-	return line,
+	return Lines
 
+#Setup initial plot
+def SetupPlot(ProbabilityFunction, Potential):
+	plt.figure(1)
+	Ax1 = plt.subplot(211)
+	Line1, = DrawPlot(ProbabilityFunction)
+	
+	Ax2 = plt.subplot(212)
+	Line2, = DrawPlot(Potential)
+	Lines = [Line1, Line2]
+	return Lines
+	
 #Generate initial conditions	
 CurrentWaveFunction = GenerateInitialWavefunction(WellWidth, Resolution, InitialWavefunctionType, (InitialWavePosition*WellWidth))
 Potential = GeneratePotential(InitialPotentialWellType, WellWidth, WellDepth, Resolution)
 ProbabilityDistribution = CalculateProbability(CurrentWaveFunction)
+Lines = SetupPlot(ProbabilityDistribution, Potential)
 
 #Create animation instance
-line_ani = FuncAnimation(fig1, Update_Line, TotalFrames, fargs=(line, Args), interval=RenderTime, blit=True)
+line_ani = FuncAnimation(fig1, Update_Line, TotalFrames, fargs=(Lines, Args), interval=RenderTime, blit=True)
 
 
 #Begin animation or recording

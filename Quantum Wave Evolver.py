@@ -21,15 +21,19 @@ InitialWavePosition = .3 #Maxima of initial wave function between -1 and 1 which
 
 #Simulation Details
 Resolution = 100 #Increased resolution (points in the well) requires increased time steps
-TimeInterval = 1*10**(-6) #1e-6 is sufficient for resolution of 100 
+TimeInterval = 1*10**(-5) #1e-5 is sufficient for resolution of 100 
 NSteps = int(Time/TimeInterval)
 SpaceInterval = WellWidth/Resolution #Size of the quanta of space
 InitialPotentialWellType = 'Box'
 InitialWavefunctionType = 'NormalizedGaussian'
+TurnOnAdiabaticPotentialEvolution = 0 #Turn on and off adiabatic changing of potential
+CheckTotalEnergy = 0 #Turn on and off energy check for conservation
+CheckTotalProbablity = 0 #Turn on and off probability check for conservation
+
 
 #Render Details
 RenderFrame = 50 #How many iterations between rendered Frames (100 is good for 1e-6 time steps
-RenderTime = 20 #Time to wait between frames if rendering fast enough
+RenderTime = 1 #Time to wait between frames if rendering fast enough
 TotalFrames = int(Time/(TimeInterval*RenderFrame))
 Args = 0 #Place Holder
 Record = 0 # 0 = output to screen, 1 = record
@@ -210,12 +214,12 @@ def CalculateProbability (WaveFunction):
 	return Probability
 
 #Iterate the wave function in time (currently only RK = 1 or Euler aproximation)
-def CalculateNextWaveFunction (WaveFunction, Potential, TimeStep, RKOrder):
+def CalculateNextWaveFunction (WaveFunction, Potential, TimeStep, Method):
 	NextWaveFunction = []
 	WaveFunctionDerivative = FunctionDerivative(WaveFunction)
 	WaveFunctionSecondDerivative = FunctionDerivative(WaveFunctionDerivative)
 	TimeDerivative = 0
-	if RKOrder == 1:
+	if Method == 'euler':
 		for Index in range(len(WaveFunction)):
 			D2Y = WaveFunctionSecondDerivative[Index][1]
 			KineticTerm = ((1j*Hbar)/(2*ParticleMass))* D2Y
@@ -232,6 +236,40 @@ def CalculateNextWaveFunction (WaveFunction, Potential, TimeStep, RKOrder):
 				
 			NextWaveFunction.append((X, NewY))
 		return NextWaveFunction
+	
+	if Method == 'crank':
+		#Fiting variables into bob's code
+		res = WellWidth/Resolution
+		numPoints = Resolution + 201
+		lam = 2*res*res/TimeInterval
+		wellShape = np.zeros(numPoints,dtype=np.complex_)
+		startingWave = np.zeros(numPoints,dtype=np.complex_)
+		for Index in range(len(WaveFunction)):
+			startingWave[Index] = WaveFunction[Index][1]
+		for Index in range(len(Potential)):
+			wellShape[Index] = Potential[Index][1]
+		
+		#Bob's code
+		en = np.zeros(numPoints,dtype=np.complex_)
+		fn = np.zeros(numPoints,dtype=np.complex_)
+		endWave = np.zeros(numPoints,dtype=np.complex_)
+
+		en[1] = 2+res*res*wellShape[1]-1.j*lam
+		fn[1] = -startingWave[2]+(1.j*lam+res*res*wellShape[1]+2)*startingWave[1]-startingWave[0]
+
+		for i in range(2,numPoints-1):
+			en[i] =2+res*res*wellShape[i]-1.j*lam - 1/en[i-1]
+			fn[i] =-startingWave[i+1]+(1.j*lam+res*res*wellShape[i]+2)*startingWave[i]-startingWave[i-1]+fn[i-1]/en[i-1]
+
+		endWave[numPoints-2] =-fn[numPoints-2]/en[numPoints-2]
+
+		for i in range(numPoints-3,0,-1):
+			endWave[i] = (endWave[i+1]-fn[i])/en[i]
+			
+		#Convert back to list of (x,y) format
+		for Index in range(len(endWave)):
+			NextWaveFunction.append((WaveFunction[Index][0], endWave[Index]))
+		return NextWaveFunction
 
 #Calculates the total probability to find the particle as a sanity check (should = 1)
 def CalculateTotalProbability(ProbabilityDistribution, SpaceInterval):
@@ -246,9 +284,12 @@ def Update_Line(Frame, Lines, Args):
 	global CurrentWaveFunction
 	global Potential
 	
-	print(Frame)
-	print(CalculateTotalProbability(ProbabilityDistribution, SpaceInterval))
-	print(CalculateEnergy(CurrentWaveFunction, Potential))
+	if (CheckTotalProbablity == 1 or CheckTotalEnergy == 1):
+		print(Frame)
+	if CheckTotalProbablity == 1:
+		print(CalculateTotalProbability(ProbabilityDistribution, SpaceInterval))
+	if CheckTotalEnergy == 1:
+		print(CalculateEnergy(CurrentWaveFunction, Potential))
 	
 	X = []
 	Y = []
@@ -265,10 +306,11 @@ def Update_Line(Frame, Lines, Args):
 	Lines[1].set_data(X,Y)
 	
 	for i in range(RenderFrame):
-		CurrentWaveFunction = CalculateNextWaveFunction(CurrentWaveFunction, Potential, TimeInterval,1)
+		CurrentWaveFunction = CalculateNextWaveFunction(CurrentWaveFunction, Potential, TimeInterval,'crank')
 		ProbabilityDistribution = CalculateProbability(CurrentWaveFunction)
 	
-	Potential = GenerateNextFeedbackPotential(1, 'NormalizedGaussian')
+	if TurnOnAdiabaticPotentialEvolution == 1:
+		Potential = GenerateNextFeedbackPotential(1, 'NormalizedGaussian')
 	
 	return Lines
 

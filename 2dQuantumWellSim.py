@@ -73,7 +73,7 @@ def initWave (center,sigma):
 
 
 def potential():
-	wellShape = np.zeros((numPoints,numPoints),dtype=np.complex_)
+	wellShape = np.zeros((numPoints,numPoints),dtype=complex)
 
 	for i in range(int(numPoints/2.0),int(numPoints/2.0)+10):
 		for j in range(int(numPoints/2.0),int(numPoints/2.0)+10):
@@ -81,7 +81,7 @@ def potential():
 	return wellShape
 
 def potentialToGraph():
-	wellShape = np.zeros((numPoints,numPoints),dtype=np.complex_)
+	wellShape = np.zeros((numPoints,numPoints),dtype=complex)
 
 	for i in range(int(numPoints/2.0),int(numPoints/2.0)+10):
 		for j in range(int(numPoints/2.0),int(numPoints/2.0)+10):
@@ -205,7 +205,7 @@ Vg = potentialToGraph()
 psiSquared = prob(psi)
 
 surface = ax.plot_surface(X, Y, psiSquared, cmap=cm.coolwarm)
-surface2 = ax.plot_surface(X,Y,Vg,cmap=cm.coolwarm)
+surface2 = ax.plot_surface(X,Y,np.absolute(Vg))
 
 
 
